@@ -80,3 +80,6 @@ $IPTABLES -A FORWARD -s 172.16.0.0/12  -j DROP
 #iptables -P FORWARD  DROP
 
 }
+
+
+
