@@ -1,0 +1,82 @@
+#!/bin/sh  /etc/rc.common
+ ########### THIS IS A REAL 1st LINE !!! 
+ #!/bin/sh /etc/rc.common
+
+   # Customized iptables script for OpenWrt 10.03
+   #  openwrt  mac filtering   taken from 
+   # http://www.unix.com/security/160564-configure-iptables-allows-list-mac-address.html
+
+  #1. we need it run postponed - to avoid a potential lockup ??????
+  #2. we like to have it as a service 
+
+START=46
+
+IPTABLES=/usr/sbin/iptables
+GREP=/bin/grep
+TAIL=/usr/bin/tail
+AWK=/usr/bin/awk
+### !!!!!!!!!!!!!!!!!!  change 1.stline; save to /etc/init.d/iptables.custom; and IFACE:
+
+IFACE=br-lan
+
+
+A=`/sbin/ifconfig $IFACE | $GREP -A 1 $IFACE | $TAIL -1 | $GREP -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' ` 
+
+MYIP=`/bin/echo $A | $AWK -F" " '{print $1}'`
+
+/bin/echo my IP = $MYIP
+LOCALIP=$MYIP
+
+
+
+
+stop() {
+        /bin/echo "DANGER: Unloading firewall's Packet Filters!"
+        $IPTABLES --flush
+        $IPTABLES -P INPUT ACCEPT
+        $IPTABLES -P FORWARD ACCEPT
+        $IPTABLES -P OUTPUT ACCEPT
+}
+
+
+
+
+start() {
+	/bin/echo "Loading custom bridging firewall script for MAC filtering"
+
+	# Flush active rules, custom tables
+	$IPTABLES --flush
+	$IPTABLES --delete-chain
+
+#	 # Set default-deny policies for all three default tables
+	 $IPTABLES -P INPUT ACCEPT
+	 $IPTABLES -P FORWARD ACCEPT
+	 $IPTABLES -P OUTPUT ACCEPT
+
+	 # Don't restrict loopback (local process intercommunication)
+	 $IPTABLES -A INPUT -i lo -j ACCEPT
+	 $IPTABLES -A OUTPUT -o lo -j ACCEPT
+
+	 # Block attempts at spoofed loopback traffic
+	 $IPTABLES -A INPUT -s $LOCALIP -j DROP
+
+######################################## MAIN PART #####################
+#     102.* net cannot pass through
+$IPTABLES -A FORWARD -s $MYIP/24 -d    $MYIP/24  -j DROP
+$IPTABLES -A FORWARD -s 10.0.0.0/8  -j DROP
+$IPTABLES -A FORWARD -s 192.168.0.0/16  -j DROP
+$IPTABLES -A FORWARD -s 172.16.0.0/12  -j DROP
+
+
+#	# cleanup-rules
+#	$IPTABLES -A INPUT -j DROP
+#	$IPTABLES -A OUTPUT -j DROP
+#	$IPTABLES -A FORWARD -j DROP
+
+#for MAC in `cat mac_addresses_file`; do
+#    echo mac=$MAC
+###  iptables -A FORWARD -i eth0 -o eth1 -m mac --mac-source $MAC -j ACCEPT
+#done
+#iptables -P FORWARD  DROP
+
+}
