@@ -1,9 +1,9 @@
 Firewalls
 =========
 
-transparent firewall (I cannot use physdev neither iprange)
- and 
- mac filtering  (works)                openwrt  setups
+transparent firewall (I cannot use physdev neither iprange)  
+and  
+ mac filtering  (works)                openwrt  setups 
 
 
 
