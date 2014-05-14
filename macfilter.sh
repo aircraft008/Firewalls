@@ -1,93 +1,82 @@
-#!/bin/sh
- #!/bin/sh /etc/rc.common
- # Customized iptables script for OpenWrt 10.03
-
-#  openwrt  mac filtering
-#        taken from 
-# http://www.unix.com/security/160564-configure-iptables-allows-list-mac-address.html
-
-#1. we need it run postponed - to avoid a potential lockup
-#2. we like to have it as a service
+#!/bin/sh /etc/rc.common
 
 START=46
 
+EXTRA_COMMANDS="list"
+EXTRA_HELP="        list  make list of macs"
+
+MYNAME=/etc/init.d/macs
+
+# 1 set static IP on WAN  openWRT
+# 2 set dhcp on LAN
+# 3 set this service active
+#
+#
+
+ECHO=/bin/echo
 IPTABLES=/usr/sbin/iptables
 GREP=/bin/grep
 TAIL=/usr/bin/tail
 AWK=/usr/bin/awk
-### !!!!!!!!!!!!!!!!!!  change 1.stline; name to /etc/init.d/iptables.custom; and IFACE:
-IFACE=eth0
+CAT=/bin/cat
+CUT=/usr/bin/cut 
+XARGS=/usr/bin/xargs
 
-#           for the bridged firewall: br-lan
+stop(){
 
-A=`/sbin/ifconfig $IFACE | $GREP -A 1 $IFACE | $TAIL -1 | $GREP -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' ` 
+ echo "deleting forwarding_rule "
 
-MYIP=`/bin/echo $A | $AWK -F" " '{print $1}'`
+while [ $? = 0 ]; do
+ $IPTABLES -D forwarding_rule 1
+done 
 
-MYMask=`/bin/echo $A | $AWK -F" " '{print $NF}'`
-MYMask="255.255.255.0" 
-/bin/echo my IP = $MYIP
- 
-LOCALIP=$MYIP
-
-
-stop() {
-        echo "DANGER: Unloading firewall's Packet Filters!"
-        $IPTABLES --flush
-        $IPTABLES -P INPUT ACCEPT
-        $IPTABLES -P FORWARD ACCEPT
-        $IPTABLES -P OUTPUT ACCEPT
+#       echo "DANGER: completely Unloading firewall's Packet Filters!"
+#        $IPTABLES --flush
+#        $IPTABLES -P INPUT ACCEPT
+#        $IPTABLES -P FORWARD ACCEPT
+#        $IPTABLES -P OUTPUT ACCEPT
 }
 
-start() {
-	echo "Loading custom bridging firewall script for MAC filtering"
 
-	# Flush active rules, custom tables
-	$IPTABLES --flush
-	$IPTABLES --delete-chain
+start(){
 
-#------I do not set default drop -----------------
-#	# Set default-deny policies for all three default tables
-#	$IPTABLES -P INPUT DROP
-#	$IPTABLES -P FORWARD DROP
-#	$IPTABLES -P OUTPUT DROP
+echo "my name is $MYNAME"
+echo "deleting forwarding_rule "
 
-	# Don't restrict loopback (local process intercommunication)
-	$IPTABLES -A INPUT -i lo -j ACCEPT
-	$IPTABLES -A OUTPUT -o lo -j ACCEPT
+while [ $? = 0 ]; do
+ $IPTABLES -D forwarding_rule 1
+done 
 
-	# Block attempts at spoofed loopback traffic
-	$IPTABLES -A INPUT -s $LOCALIP -j DROP
+echo  "creating forwarding_rule set..."
 
-	# Allow SSH to firewall from the local LAN
-	$IPTABLES -A INPUT -p tcp -s $LOCALLAN --dport 22 -j ACCEPT
-	$IPTABLES -A OUTPUT -p tcp --sport 22 -j ACCEPT
 
-        # Allow HTTP to firewall from the local LAN    
-        $IPTABLES -A INPUT -p tcp -s $LOCALLAN --dport 80 -j ACCEPT                     
-        $IPTABLES -A OUTPUT -p tcp --sport 80 -j ACCEPT                                 
-        $IPTABLES -A INPUT -p tcp -s $LOCALLAN --dport 443 -j ACCEPT                     
+MACLIST=`$CAT $MYNAME  | $GREP -v \# |  $AWK  '/..\:..\:..\:..\:..\:../{print $1}'  `
 
-	# pass DNS queries and their replies
-	$IPTABLES -A FORWARD -p udp -s $LOCALLAN --dport 53 -j ACCEPT
-	$IPTABLES -A FORWARD -p tcp -s $LOCALLAN --dport 53 -j ACCEPT
-	$IPTABLES -A FORWARD -p udp --sport 53 -d $LOCALLAN -j ACCEPT
-	$IPTABLES -A FORWARD -p tcp --sport 53 -d $LOCALLAN -j ACCEPT
-	
-#	# cleanup-rules
-#	$IPTABLES -A INPUT -j DROP
-#	$IPTABLES -A OUTPUT -j DROP
-#	$IPTABLES -A FORWARD -j DROP
 
-for MAC in `cat mac_addresses_file`; do
-    echo mac=$MAC
-#  iptables -A FORWARD -i eth0 -o eth1 -m mac --mac-source $MAC -j ACCEPT
+for j in $MACLIST
+do   
+	$IPTABLES -A forwarding_rule -m mac --mac-source  $j  -j ACCEPT
 done
+	 $IPTABLES -A forwarding_rule -j DROP
 
-#iptables -P FORWARD  DROP
-
+echo "...MAC forwarding_rule applied"
 
 }
+
+
+list(){
+
+echo list of mac addresses
+################# DATA ##################################
+# #### ?opkg install iptables-mod-ipopt
+####################################################
+echo "
+11:22:33:44:55:66  123  jara
+"
+$IPTABLES -L | $GREP forwarding_rule -A 2
+}
+
+
 
 
 
